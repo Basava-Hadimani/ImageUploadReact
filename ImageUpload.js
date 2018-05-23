@@ -1,19 +1,20 @@
 
 
 
-
 import  React from 'react';
 import UploadImage from '../UploadImage.js';
 import ImageUploadInput from './ImageUploadInput';
+import apiConstants from '../../../constants/api.js';
+import axiosRequest from '../../../helper/request';
+var FormData = require('form-data');
 
-
-//Image path down
 
 var ImageAdd = require('../../../../public/images/imageAdd.png');
 
 
 let imageIndex = 0;
 let imageArray = [];
+let imageURL = [];
 
 class ImageUpload extends React.Component {
 
@@ -21,7 +22,9 @@ class ImageUpload extends React.Component {
       super(props)
       this.state = {
       		isModalOpen: false,
-      		image : []
+      		image : [],
+            fileUpload:{},
+            comment : ''
        	}
 
        this.handleUpload = this.handleUpload.bind(this);  
@@ -31,7 +34,37 @@ class ImageUpload extends React.Component {
 	}
 
 	closeModal() {
-    	this.setState({ isModalOpen: false })
+       let formData = new FormData();
+       var errorFlag = false;
+
+       (this.state.fileUpload).map((item, index)=>{
+
+
+       formData.append('object', item);
+
+
+        var invocation = new XMLHttpRequest();
+        var url = 'http://YOUR/COMPLETE/URL'
+        invocation.open('POST', url);
+        invocation.onreadystatechange = function(){
+            if(invocation.readyState === 4 && invocation.status === 200) {
+                            let response = invocation.responseText;
+                            let url = JSON.parse(response).fileurl;
+                            imageURL.push(url.toString());
+            }else{
+                errorFlag = true;
+            }
+        };
+        invocation.send(formData);
+
+       })
+       this.props.updateImageURL(imageURL);
+
+       if(!errorFlag){
+            this.setState({ isModalOpen: false });
+       }else{
+            alert("Can not upload images");
+       }
 	}
 
 handleUpload(event) {
@@ -44,27 +77,67 @@ handleUpload(event) {
             };
             reader.readAsDataURL(event.target.files[0]);
         }
+
+        const target = event.currentTarget;
+        if(target.name==='fileUpload'){
+            this.setState({
+                [target.name]:[...this.state.fileUpload, target.files[0]]
+
+            })
+        }else{
+            this.setState({
+                [target.name]: target.value
+            });
+
+        }
     }
 
   removeImage(event){
         
         let eventId = event.target.id;
-        let imageNumber = eventId.slice(eventId.length - 1,eventId.length);
 
-        console.log(imageNumber);
+        if(eventId){
+            let imageNumber = eventId.slice(eventId.length - 1,eventId.length);
 
-        console.log(imageArray);
+            let URL = this.state.fileUpload;
 
-        imageArray.splice(imageNumber - 1, 1);
+            imageArray.splice(imageNumber - 1, 1);
+            URL.splice(imageNumber - 1, 1);
 
-        console.log(imageArray);
-        imageIndex -= 1;
+            imageIndex -= 1;
 
-        this.setState({image: imageArray});
+            this.setState({image: imageArray});
+            this.setState({fileUpload : URL});
+        }
 
   }
 
+    componentWillUnmount(){
+        imageIndex = 0;
+        imageArray = [];
+    }
+
+    imageBlock(){
+
+    	return Object.entries([...Array(8)]).map((item, index)=>{
+    		index += 1;
+    		let string = `image${index}`;
+    		return (
+    				    <div key={index} style={styles.removebuttonAlign}>
+                        <img  style={styles.image} className={string} src={((imageIndex) === (index - 1))?ImageAdd:this.state.image[index - 1]}/>
+                        {this.state.image[index - 1]?<button id={string} className="btn-link">Remove</button>:<p></p>}
+                        </div>
+
+    			)
+    	})
+   	}
+
+
    render() {
+
+
+        console.log("URL",imageURL);    
+
       return (
         <div>
         	    <div>
@@ -76,20 +149,14 @@ handleUpload(event) {
 
                         <div style={styles.imageContainer} onClick={(event)=>{this.removeImage(event)}}>
 
-                        <div style={styles.removebuttonAlign}>
-                        <img ref='image' style={styles.image} className="image1" src={this.state.image[0]?this.state.image[0]:ImageAdd}/>
-                        {this.state.image[0]?<button id="image1" className="btn-link">Remove</button>:<p></p>}
-                        </div>
-
-                        <div style={styles.removebuttonAlign}>
-                        <img ref='image' style={styles.image} className="image2" src={((imageIndex) === 1)?ImageAdd:this.state.image[1]}/>
-                        {this.state.image[1]?<button id="image2" className="btn-link" >Remove</button>:<p></p>}
-                        </div>
+                        {this.imageBlock()}
 
                         </div>
 
-
-                        <ImageUploadInput
+                        {(imageIndex === 8)?
+                        	<div></div>
+                        	:
+                        	<ImageUploadInput
                             onChange={this.handleUpload}
                             label={"Attach Image"}
                             name={"fileUpload"}
@@ -97,7 +164,8 @@ handleUpload(event) {
                             uploadText={"Browse"}
                             fileTypeText="Image must be of PNG/JPG format"
                             accept=".jpg, .png"
-                        />
+                        	/>
+                    	}
 
 
                         <p><button  className="col-md-2 form-group" style={styles.uploadbutton} onClick={() => this.closeModal()}><strong style={styles.uploadText}>Upload</strong></button></p>
@@ -119,8 +187,9 @@ const styles = {
     image : {
         display : "inline-block",
         height : 100,
-        width : 100
-    },
+        width : 100,
+		borderRadius : 20    
+	},
     uploadText : {
         marginLeft : 40
     },
